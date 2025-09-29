@@ -25,6 +25,8 @@ import {
   unref,
   watch,
   watchEffect,
+  onMounted,
+  onBeforeUnmount,
 } from 'vue'
 import { localesMap } from './utils'
 import VtdHeader from './components/Header.vue'
@@ -438,6 +440,34 @@ const calendar = computed(() => {
     },
   }
 })
+
+// === Teleport positioning logic ===
+const triggerRef = ref<HTMLElement | null>(null)
+const panelStyle = ref<Record<string, string>>({})
+
+const updatePosition = () => {
+  if (triggerRef.value) {
+    const rect = triggerRef.value.getBoundingClientRect()
+    panelStyle.value = {
+      position: 'absolute',
+      top: rect.bottom + window.scrollY + 'px',
+      left: rect.left + window.scrollX + 'px',
+      width: rect.width + 'px'
+    }
+  }
+}
+
+onMounted(() => {
+  updatePosition()
+  window.addEventListener('resize', updatePosition)
+  window.addEventListener('scroll', updatePosition, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updatePosition)
+  window.removeEventListener('scroll', updatePosition, true)
+})
+// === End teleport logic ===
 
 const displayDatepicker = ref(false)
 
@@ -1433,7 +1463,7 @@ provide(setToCustomShortcutKey, setToCustomShortcut)
   <Popover v-if="!props.noInput" id="vtd" v-slot="{ open }: { open: boolean }" as="div" class="relative w-full">
     <PopoverOverlay v-if="props.overlay && !props.disabled" class="fixed inset-0 bg-black opacity-30" />
 
-    <PopoverButton as="label" class="relative block">
+    <PopoverButton ref="triggerRef" as="label" class="relative block">
       <slot :value="pickerValue" :placeholder="givenPlaceholder" :clear="clearPicker">
         <input ref="VtdInputRef" v-bind="$attrs" v-model="pickerValue" type="text" class="relative block w-full"
           :disabled="props.disabled" :class="[
@@ -1471,7 +1501,8 @@ provide(setToCustomShortcutKey, setToCustomShortcut)
       leave-to-class="opacity-0 translate-y-3">
       <teleport to="body">
         <PopoverPanel v-if="!props.disabled" v-slot="{ close }: { close: (ref?: Ref | HTMLElement) => void }" as="div"
-          class="relative z-50">
+          class="relative z-50"
+          :style="panelStyle">
           <div class="absolute z-50 top-full sm:mt-2.5" :class="getAbsoluteParentClass(open)">
             <div ref="VtdRef"
               class="fixed inset-0 z-50 overflow-y-auto sm:overflow-visible sm:static sm:z-auto bg-white dark:bg-vtd-secondary-800 sm:rounded-lg shadow-sm">
